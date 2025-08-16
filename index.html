@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none';">
-    <title>文書結合ツール（PDF・Excel・Word対応）</title>
+    <title>PDF結合ツール</title>
     <style>
         body {
             font-family: sans-serif;
@@ -99,13 +99,57 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
-        .filename-input {
-            width: 100%;
+        .filename-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0 5px 0;
+        }
+        
+        .filename-edit-container {
+            margin: 5px 0 10px 0;
+        }
+        
+        .filename-select {
+            flex: 1;
             padding: 10px;
-            margin: 10px 0;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
+            background-color: white;
+        }
+        
+        .filename-select:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        
+        .filename-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .filename-input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        
+        .filename-custom-btn {
+            padding: 8px 12px;
+            font-size: 14px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        
+        .filename-custom-btn:hover {
+            background-color: #c82333;
         }
         .status {
             margin: 10px 0;
@@ -130,19 +174,19 @@
 </head>
 <body>
     <div class="container">
-        <h1>文書結合ツール</h1>
+        <h1>PDF結合ツール</h1>
         
         <div class="drop-zone" id="dropZone">
-            <p>PDF・Excel・Wordファイルをここにドラッグ&ドロップするか、下のボタンで選択してください</p>
+            <p>PDFファイルをここにドラッグ&ドロップするか、下のボタンで選択してください</p>
         </div>
         
         <div class="file-input">
-            <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.docx,.doc" style="display: block; margin: 10px 0;">
+            <input type="file" id="fileInput" multiple accept=".pdf" style="display: block; margin: 10px 0;">
             <button type="button" id="fileSelectBtn" class="btn btn-primary">ファイルを選択</button>
             <label for="fileInput" class="file-select-label" style="margin-left: 10px;">または、ここをクリック</label>
         </div>
         
-        <div class="status" id="status">PDF・Excel・Wordファイルを選択してください</div>
+        <div class="status" id="status">PDFファイルを選択してください</div>
         <div id="debugInfo" style="display: none; background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #dee2e6;"></div>
         
         <div class="file-list">
@@ -151,15 +195,21 @@
         </div>
         
         <div class="execute-section">
-            <label for="filename">結合後のファイル名:</label>
-            <input type="text" id="filename" class="filename-input" placeholder="ファイル名を入力" list="filename-suggestions">
-            <datalist id="filename-suggestions">
-                <option value="20250月_名前_出勤簿">
-                <option value="20250月_名前_身嗜手当">
-                <option value="20250月_名前_社販手当">
-                <option value="20250月_名前_報奨金">
-                <option value="20250月__名前_立替金">
-            </datalist>
+            <label for="filename-select">結合後のファイル名:</label>
+            <div class="filename-container">
+                <select id="filename-select" class="filename-select">
+                    <option value="">ファイル名を選択してください</option>
+                    <option value="20250月_名前_出勤簿">20250月_名前_出勤簿</option>
+                    <option value="20250月_名前_身嗜手当">20250月_名前_身嗜手当</option>
+                    <option value="20250月_名前_社販手当">20250月_名前_社販手当</option>
+                    <option value="20250月_名前_報奨金">20250月_名前_報奨金</option>
+                    <option value="20250月_名前_立替金">20250月_名前_立替金</option>
+                </select>
+                <button type="button" id="clear-filename-btn" class="filename-custom-btn">クリア</button>
+            </div>
+            <div class="filename-edit-container">
+                <input type="text" id="filename" class="filename-input" placeholder="ファイル名を入力または上から選択">
+            </div>
             
             <button id="mergeBtn" class="btn btn-primary" disabled onclick="mergePDFs()">PDF結合実行</button>
         </div>
@@ -167,15 +217,14 @@
         <div class="warning">
             <strong>注意:</strong> 
             <ul style="margin: 5px 0; padding-left: 20px;">
-                <li>Excel・Wordファイルは簡易的にPDFに変換されます（レイアウトは基本的なもの）</li>
-                <li>複雑な書式・図表・マクロ等は正しく変換されない場合があります</li>
+                <li>パスワード保護されたPDFファイルは処理できません</li>
                 <li>巨大ファイルや多数のファイルを結合する場合、メモリ制約により処理に時間がかかります</li>
+                <li>ブラウザ内での処理のため、シンプルなページ結合のみ対応しています</li>
             </ul>
         </div>
     </div>
 
     <script src="./lib/pdf-lib.min.js"></script>
-    <script src="./lib/xlsx.full.min.js"></script>
     <script>
         let documentFiles = [];
         let unsupportedCount = 0;
@@ -187,6 +236,8 @@
         const status = document.getElementById('status');
         const mergeBtn = document.getElementById('mergeBtn');
         const filenameInput = document.getElementById('filename');
+        const filenameSelect = document.getElementById('filename-select');
+        const clearFilenameBtn = document.getElementById('clear-filename-btn');
         const debugInfo = document.getElementById('debugInfo');
         
         // デバッグモード（URLパラメータで有効化）
@@ -205,20 +256,61 @@
             }
         }
         
-        // ライブラリの読み込み確認
+        // ライブラリの読み込み確認とファイル名操作の初期化
         window.addEventListener('load', () => {
             debugLog('Window loaded');
             debugLog(`PDFLib available: ${typeof PDFLib !== 'undefined'}`);
-            debugLog(`XLSX available: ${typeof XLSX !== 'undefined'}`);
             
             if (typeof PDFLib !== 'undefined') {
                 debugLog(`PDFLib.PDFDocument: ${typeof PDFLib.PDFDocument}`);
             }
-            if (typeof XLSX !== 'undefined') {
-                debugLog(`XLSX.read: ${typeof XLSX.read}`);
-                debugLog(`XLSX.utils: ${typeof XLSX.utils}`);
-            }
+            
+            // ファイル名操作の初期化
+            setupFilenameControls();
         });
+        
+        // ファイル名コントロールの設定
+        function setupFilenameControls() {
+            // プルダウン選択時の動作
+            filenameSelect.addEventListener('change', function() {
+                if (this.value) {
+                    // プルダウンで選択された値を編集欄に設定
+                    filenameInput.value = this.value;
+                    filenameInput.focus();
+                    // 編集欄の末尾にカーソルを移動
+                    filenameInput.setSelectionRange(filenameInput.value.length, filenameInput.value.length);
+                    debugLog(`Filename selected from dropdown and set to edit field: ${this.value}`);
+                } else {
+                    // 空の選択肢が選ばれた場合は編集欄をクリア
+                    filenameInput.value = '';
+                    debugLog('Dropdown selection cleared');
+                }
+                updateMergeButton();
+            });
+            
+            // クリアボタンの動作
+            clearFilenameBtn.addEventListener('click', function() {
+                // プルダウンと編集欄をクリア
+                filenameSelect.value = '';
+                filenameInput.value = '';
+                filenameInput.focus();
+                debugLog('Filename fields cleared');
+                updateMergeButton();
+            });
+            
+            // 編集欄の変更監視
+            filenameInput.addEventListener('input', function() {
+                // 編集欄が変更されたらプルダウンをリセット
+                if (this.value.trim() !== filenameSelect.value) {
+                    // 選択された値と異なる場合はプルダウンをリセット
+                    filenameSelect.value = '';
+                }
+                if (this.value.trim()) {
+                    debugLog(`Filename edited: ${this.value}`);
+                }
+                updateMergeButton();
+            });
+        }
 
         // ドキュメント全体でのドラッグ&ドロップ防止（ブラウザでファイルが開かないように）
         document.addEventListener('dragover', (e) => {
@@ -324,13 +416,7 @@
                 const fileName = file.name.toLowerCase();
                 debugLog(`Processing file: ${fileName}, type: ${file.type}`);
                 
-                if (file.type === 'application/pdf' || fileName.endsWith('.pdf') ||
-                    fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ||
-                    fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
-                    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-                    file.type === 'application/vnd.ms-excel' ||
-                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                    file.type === 'application/msword') {
+                if (file.type === 'application/pdf' || fileName.endsWith('.pdf')) {
                     newDocumentFiles.push(file);
                     debugLog(`Added file: ${fileName}`);
                 } else {
@@ -383,12 +469,7 @@
 
         function getFileType(fileName) {
             const ext = fileName.toLowerCase().split('.').pop();
-            switch(ext) {
-                case 'pdf': return 'PDF';
-                case 'xlsx': case 'xls': return 'Excel';
-                case 'docx': case 'doc': return 'Word';
-                default: return '不明';
-            }
+            return ext === 'pdf' ? 'PDF' : '不明';
         }
 
         function moveFile(index, direction) {
@@ -407,38 +488,73 @@
         }
 
         function updateMergeButton() {
-            mergeBtn.disabled = documentFiles.length === 0;
+            // ファイルがあり、かつファイル名が設定されているかをチェック
+            const hasFiles = documentFiles.length > 0;
+            const hasFilename = getSelectedFilename().trim() !== '';
+            
+            mergeBtn.disabled = !hasFiles || !hasFilename;
+            
+            if (hasFiles && !hasFilename) {
+                mergeBtn.textContent = 'PDF結合実行（ファイル名を選択してください）';
+            } else {
+                mergeBtn.textContent = 'PDF結合実行';
+            }
+        }
+        
+        // 選択されたファイル名を取得する関数
+        function getSelectedFilename() {
+            // 編集欄の値を優先して返す
+            return filenameInput.value.trim();
         }
 
         function sanitizeFilename(filename) {
             return filename.replace(/[<>:"/\\|?*]/g, '_');
         }
         
-        // 日本語文字を安全にPDFに描画するためのヘルパー関数
+        // 日本語文字を可読性を保って安全にPDFに描画するためのヘルパー関数
         function sanitizeTextForPdf(text) {
             debugLog(`Sanitizing text: ${text.substring(0, 30)}...`);
             
-            // まずはローマ字に変換を試行
+            // より詳細で可読性のある変換
             let result = text
-                // 一般的な日本語単語の置換
-                .replace(/申請書/g, 'shinseisho')
+                // 月・年・日の処理
+                .replace(/(\d+)年/g, '$1-nen')
+                .replace(/(\d+)月/g, '$1-gatsu')
+                .replace(/(\d+)日/g, '$1-nichi')
+                
+                // 一般的な業務用語をローマ字に変換
+                .replace(/申請書/g, 'shinsei-sho')
+                .replace(/身嗜み手当/g, 'midashinami-teate')
                 .replace(/手当/g, 'teate')
-                .replace(/身嗜み/g, 'midashinami')
-                .replace(/出勤簿/g, 'shukkinbo')
-                .replace(/報奨金/g, 'hoshokin')
-                .replace(/立替金/g, 'tatekaekin')
+                .replace(/出勤簿/g, 'shukkin-bo')
+                .replace(/報奨金/g, 'hosho-kin')
+                .replace(/立替金/g, 'tatekaer-kin')
                 .replace(/社販/g, 'shahan')
-                // 一般的なひらがな
-                .replace(/です/g, 'desu')
-                .replace(/ます/g, 'masu')
+                .replace(/点検表/g, 'tenken-hyo')
+                .replace(/車輌/g, 'sharyo')
+                .replace(/最新/g, 'saishin')
+                .replace(/月初/g, 'getsumatsu')
+                
+                // 一般的なカタカナ
                 .replace(/ファイル/g, 'file')
                 .replace(/フォルダ/g, 'folder')
                 .replace(/サイズ/g, 'size')
                 .replace(/タイプ/g, 'type')
-                // 残りの文字を安全な文字に置換
-                .replace(/[あ-ん]/g, (match) => `[hiragana]`) // ひらがな
-                .replace(/[ア-ン]/g, (match) => `[katakana]`) // カタカナ
-                .replace(/[一-龯]/g, (match) => `[kanji]`) // 漢字
+                .replace(/シート/g, 'sheet')
+                .replace(/データ/g, 'data')
+                
+                // 一般的なひらがな
+                .replace(/です/g, 'desu')
+                .replace(/ます/g, 'masu')
+                .replace(/する/g, 'suru')
+                .replace(/した/g, 'shita')
+                .replace(/する/g, 'suru')
+                .replace(/き/g, 'ki')
+                
+                // 残りの日本語文字を括弧内で表示（可読性保持）
+                .replace(/[あ-ん]/g, (match) => `(${match})`) // ひらがなは括弧で表示
+                .replace(/[ア-ン]/g, (match) => `(${match})`) // カタカナは括弧で表示
+                .replace(/[一-龯]/g, (match) => `(${match})`) // 漢字は括弧で表示
                 .replace(/[^\x00-\xFF]/g, '?'); // その他の非ASCII文字
                 
             debugLog(`Sanitized result: ${result.substring(0, 30)}...`);
@@ -464,190 +580,6 @@
             }
         }
 
-        async function convertExcelToPdf(file) {
-            debugLog(`Starting Excel conversion for: ${file.name}`);
-            
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                debugLog(`Excel file loaded, size: ${arrayBuffer.byteLength} bytes`);
-                
-                // XLSXライブラリの確認
-                if (typeof XLSX === 'undefined') {
-                    throw new Error('XLSX library not loaded');
-                }
-                
-                debugLog(`XLSX library version: ${XLSX.version || 'unknown'}`);
-                
-                let workbook;
-                try {
-                    // .xls と .xlsx 両方に対応する読み込み設定
-                    workbook = XLSX.read(arrayBuffer, {
-                        type: 'array',
-                        cellDates: true,
-                        cellNF: false,
-                        cellStyles: false,
-                        sheetStubs: true,
-                        password: ""
-                    });
-                    debugLog(`Excel workbook parsed successfully`);
-                } catch (parseError) {
-                    debugLog(`Parse error: ${parseError.message}`);
-                    if (parseError.message.includes('parse_xlscfb')) {
-                        throw new Error('この.xlsファイル形式はサポートされていません。.xlsxファイルに変換してお試しください。');
-                    }
-                    throw parseError;
-                }
-                
-                if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-                    throw new Error('Excelファイルにシートが見つかりません');
-                }
-                
-                debugLog(`Excel workbook parsed, sheets: ${workbook.SheetNames.length}`);
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                debugLog(`Processing sheet: ${firstSheetName}`);
-                
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
-                const { width, height } = page.getSize();
-                
-                let yPosition = height - 50;
-                const lineHeight = 20;
-                
-                // ヘッダー情報を追加
-                await drawTextSafely(page, `Excel file: ${file.name}`, {
-                    x: 50,
-                    y: yPosition,
-                    size: 12
-                });
-                yPosition -= 30;
-                
-                await drawTextSafely(page, `Sheet: ${firstSheetName}`, {
-                    x: 50,
-                    y: yPosition,
-                    size: 10
-                });
-                yPosition -= 30;
-                
-                // データの抽出とPDF化
-                try {
-                    // CSVとしてデータを抽出
-                    const csvData = XLSX.utils.sheet_to_csv(worksheet, {
-                        FS: ',',
-                        RS: '\n',
-                        forceQuotes: false,
-                        skipHidden: false
-                    });
-                    
-                    const lines = csvData.split('\n').filter(line => line.trim());
-                    debugLog(`Excel data extracted, ${lines.length} lines`);
-                    
-                    if (lines.length === 0) {
-                        await drawTextSafely(page, 'No data found in this sheet', {
-                            x: 50,
-                            y: yPosition,
-                            size: 10
-                        });
-                    } else {
-                        for (const line of lines.slice(0, 30)) { // 最大30行まで
-                            if (yPosition < 50) break;
-                            const displayLine = line.substring(0, 80); // 最大80文字まで
-                            if (displayLine.trim()) {
-                                await drawTextSafely(page, displayLine, {
-                                    x: 50,
-                                    y: yPosition,
-                                    size: 8
-                                });
-                            }
-                            yPosition -= lineHeight;
-                        }
-                        
-                        if (lines.length > 30) {
-                            await drawTextSafely(page, `... and ${lines.length - 30} more rows`, {
-                                x: 50,
-                                y: yPosition - 10,
-                                size: 8
-                            });
-                        }
-                    }
-                } catch (dataError) {
-                    debugLog(`Data extraction error: ${dataError.message}`);
-                    await drawTextSafely(page, 'Error reading Excel data - file may be corrupted or protected', {
-                        x: 50,
-                        y: yPosition,
-                        size: 10
-                    });
-                    yPosition -= 30;
-                    await drawTextSafely(page, `Error details: ${dataError.message}`, {
-                        x: 50,
-                        y: yPosition,
-                        size: 8
-                    });
-                }
-                
-                debugLog('Excel to PDF conversion completed');
-                return await pdfDoc.save();
-                
-            } catch (error) {
-                debugLog(`ERROR in Excel conversion: ${error.message}`);
-                
-                // より詳細なエラーメッセージ
-                if (error.message.includes('XLSX library not loaded')) {
-                    throw new Error('Excel処理ライブラリが読み込まれていません。ページを再読み込みしてください。');
-                } else if (error.message.includes('parse_xlscfb')) {
-                    throw new Error('古い.xlsファイル形式はサポートされていません。Excelで.xlsxに変換してお試しください。');
-                } else if (error.message.includes('Unsupported file')) {
-                    throw new Error('サポートされていないExcelファイル形式です。');
-                } else if (error.message.includes('password')) {
-                    throw new Error('パスワード保護されたExcelファイルは処理できません。');
-                } else {
-                    throw new Error(`Excelファイルの変換に失敗しました: ${error.message}`);
-                }
-            }
-        }
-
-        async function convertWordToPdf(file) {
-            debugLog(`Starting Word conversion for: ${file.name}`);
-            
-            try {
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                const page = pdfDoc.addPage([595.28, 841.89]);
-                const { width, height } = page.getSize();
-                
-                // Word文書の場合は簡易的なファイル情報のみ表示（日本語を英語に変更）
-                const info = [
-                    `Filename: ${file.name}`,
-                    `Size: ${formatFileSize(file.size)}`,
-                    `Type: Word Document`,
-                    `Last Modified: ${new Date(file.lastModified).toLocaleString()}`,
-                    '',
-                    '* This document was converted in simplified mode.',
-                    'Please open the original file for accurate content.',
-                    '',
-                    'For complete Word to PDF conversion with Japanese text,',
-                    'commercial libraries (Nutrient, Apryse, etc.) are required.'
-                ];
-                
-                let yPosition = height - 100;
-                const lineHeight = 30;
-                
-                for (const line of info) {
-                    await drawTextSafely(page, line, {
-                        x: 50,
-                        y: yPosition,
-                        size: 12
-                    });
-                    yPosition -= lineHeight;
-                }
-                
-                debugLog('Word to PDF conversion completed');
-                return await pdfDoc.save();
-                
-            } catch (error) {
-                debugLog(`ERROR in Word conversion: ${error.message}`);
-                throw new Error(`Wordファイルの変換に失敗しました: ${error.message}`);
-            }
-        }
 
         async function mergePDFs() {
             if (documentFiles.length === 0) {
@@ -666,9 +598,6 @@
                 if (typeof PDFLib === 'undefined') {
                     throw new Error('PDFLib is not loaded');
                 }
-                if (typeof XLSX === 'undefined') {
-                    throw new Error('XLSX is not loaded');
-                }
 
                 debugLog('Creating merged PDF document');
                 const mergedPdf = await PDFLib.PDFDocument.create();
@@ -686,14 +615,6 @@
                             debugLog(`Loading PDF file: ${file.name}`);
                             pdfBytes = await file.arrayBuffer();
                             debugLog(`PDF arrayBuffer size: ${pdfBytes.byteLength} bytes`);
-                        } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                            debugLog(`Converting Excel file: ${file.name}`);
-                            pdfBytes = await convertExcelToPdf(file);
-                            debugLog(`Excel converted to PDF, size: ${pdfBytes.byteLength} bytes`);
-                        } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-                            debugLog(`Converting Word file: ${file.name}`);
-                            pdfBytes = await convertWordToPdf(file);
-                            debugLog(`Word converted to PDF, size: ${pdfBytes.byteLength} bytes`);
                         } else {
                             debugLog(`Skipping unsupported file: ${file.name}`);
                             continue; // 対応外ファイルはスキップ
@@ -730,7 +651,7 @@
                 const mergedPdfBytes = await mergedPdf.save();
                 debugLog(`Merged PDF saved, size: ${mergedPdfBytes.byteLength} bytes`);
                 
-                let filename = filenameInput.value.trim();
+                let filename = getSelectedFilename();
                 if (!filename) {
                     filename = 'merged_documents';
                 }
