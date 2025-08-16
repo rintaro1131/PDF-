@@ -176,7 +176,7 @@
     <div class="container">
         <h1>PDF結合ツール</h1>
         
-        <div class="drop-zone" id="dropZone">
+        <div class="drop-zone" id="dropZone" data-drop-zone="true">
             <p>PDFファイルをここにドラッグ&ドロップするか、下のボタンで選択してください</p>
         </div>
         
@@ -267,6 +267,9 @@
             
             // ファイル名操作の初期化
             setupFilenameControls();
+            
+            // ドラッグ&ドロップイベントの初期化
+            setupDragAndDrop();
         });
         
         // ファイル名コントロールの設定
@@ -312,63 +315,78 @@
             });
         }
 
-        // ドキュメント全体でのドラッグ&ドロップ防止（ブラウザでファイルが開かないように）
-        document.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        
-        document.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        
-        document.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        
-        document.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+        // ドラッグ&ドロップの初期化関数
+        function setupDragAndDrop() {
+            debugLog('Setting up drag and drop events');
+            
+            // ドキュメント全体でのドラッグ&ドロップ防止（ブラウザでファイルが開かないように）
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }
+            
+            // より強力なイベント防止
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.addEventListener(eventName, preventDefaults, true);
+                document.body.addEventListener(eventName, preventDefaults, true);
+                window.addEventListener(eventName, preventDefaults, true);
+            });
+            
+            // ドロップゾーン外でのドロップを明示的に防止
+            document.addEventListener('drop', (e) => {
+                const isDropZone = e.target.closest('[data-drop-zone="true"]');
+                if (!isDropZone) {
+                    preventDefaults(e);
+                    debugLog('Drop prevented outside drop zone');
+                    return false;
+                }
+            }, true);
 
-        // ドロップゾーン専用のドラッグ&ドロップイベント
-        dropZone.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.add('dragover');
-            debugLog('Drag enter detected');
-        });
-        
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.add('dragover');
-        });
+            // ドロップゾーン専用のドラッグ&ドロップイベント
+            dropZone.addEventListener('dragenter', (e) => {
+                preventDefaults(e);
+                dropZone.classList.add('dragover');
+                debugLog('Drag enter detected on drop zone');
+            }, true);
+            
+            dropZone.addEventListener('dragover', (e) => {
+                preventDefaults(e);
+                dropZone.classList.add('dragover');
+                // ドラッグエフェクトを明示的に設定
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = 'copy';
+                }
+            }, true);
 
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // ドロップゾーンから完全に出た場合のみクラスを削除
-            if (!dropZone.contains(e.relatedTarget)) {
+            dropZone.addEventListener('dragleave', (e) => {
+                preventDefaults(e);
+                // ドロップゾーンから完全に出た場合のみクラスを削除
+                if (!dropZone.contains(e.relatedTarget)) {
+                    dropZone.classList.remove('dragover');
+                    debugLog('Drag leave detected from drop zone');
+                }
+            }, true);
+
+            dropZone.addEventListener('drop', (e) => {
+                preventDefaults(e);
                 dropZone.classList.remove('dragover');
-                debugLog('Drag leave detected');
-            }
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('dragover');
-            debugLog(`Drop detected, files: ${e.dataTransfer.files.length}`);
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                handleFiles(e.dataTransfer.files);
-            } else {
-                debugLog('ERROR: No files in drop event');
-                status.textContent = 'ファイルの読み込みに失敗しました。再度お試しください。';
-            }
-        });
+                debugLog(`Drop detected on drop zone, files: ${e.dataTransfer?.files?.length || 0}`);
+                
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    debugLog('Processing dropped files...');
+                    handleFiles(e.dataTransfer.files);
+                    status.textContent = `${e.dataTransfer.files.length}件のファイルを読み込みました`;
+                } else {
+                    debugLog('ERROR: No files in drop event');
+                    status.textContent = 'ファイルの読み込みに失敗しました。再度お試しください。';
+                }
+                
+                return false;
+            }, true);
+            
+            debugLog('Drag and drop events setup completed');
+        }
 
         // ファイル選択ボタンイベント
         fileSelectBtn.addEventListener('click', function(e) {
