@@ -224,8 +224,8 @@
         </div>
     </div>
 
-    <script src="./lib/pdf-lib.min.js"></script>
-    <script>
+    <script src="./lib/pdf-lib.min.js" defer></script>
+    <script defer>
         let documentFiles = [];
         let unsupportedCount = 0;
 
@@ -240,11 +240,13 @@
         const clearFilenameBtn = document.getElementById('clear-filename-btn');
         const debugInfo = document.getElementById('debugInfo');
         
-        // デバッグモード（URLパラメータで有効化）
-        const isDebugMode = new URLSearchParams(window.location.search).has('debug');
+        // デバッグモード（URLパラメータで有効化、またはVercel環境で自動有効化）
+        const isVercelEnvironment = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('.vercel.app');
+        const isDebugMode = new URLSearchParams(window.location.search).has('debug') || isVercelEnvironment;
         if (isDebugMode) {
             debugInfo.style.display = 'block';
             debugLog('Debug mode enabled');
+            debugLog(`Environment: ${isVercelEnvironment ? 'Vercel' : 'Local'}`);
         }
         
         function debugLog(message) {
@@ -256,24 +258,78 @@
             }
         }
         
-        // ライブラリの読み込み確認とファイル名操作の初期化
-        window.addEventListener('load', () => {
-            debugLog('Window loaded');
+        // より確実な初期化のために複数のイベントで初期化を試行
+        let isInitialized = false;
+        
+        function tryInitialization() {
+            if (isInitialized) {
+                debugLog('Already initialized, skipping');
+                return;
+            }
+            
+            debugLog('Attempting initialization...');
             debugLog(`PDFLib available: ${typeof PDFLib !== 'undefined'}`);
             
             if (typeof PDFLib !== 'undefined') {
                 debugLog(`PDFLib.PDFDocument: ${typeof PDFLib.PDFDocument}`);
             }
             
-            // DOM要素が確実に準備できるように遅延実行
-            setTimeout(() => {
-                // ファイル名操作の初期化
-                setupFilenameControls();
-                
-                // ドラッグ&ドロップイベントの初期化
-                setupDragAndDrop();
-            }, 100);
+            // DOM要素の存在を事前チェック
+            const requiredElements = [
+                'filename-select',
+                'filename', 
+                'clear-filename-btn',
+                'dropZone',
+                'fileInput',
+                'fileSelectBtn'
+            ];
+            
+            const missingElements = requiredElements.filter(id => !document.getElementById(id));
+            
+            if (missingElements.length > 0) {
+                debugLog(`Missing elements: ${missingElements.join(', ')}`);
+                // 要素が足りない場合は再試行
+                setTimeout(tryInitialization, 200);
+                return;
+            }
+            
+            debugLog('All required elements found, proceeding with initialization');
+            
+            // 初期化実行
+            setupFilenameControls();
+            setupDragAndDrop();
+            
+            isInitialized = true;
+            debugLog('Initialization completed successfully');
+        }
+        
+        // 複数のタイミングで初期化を試行
+        document.addEventListener('DOMContentLoaded', () => {
+            debugLog('DOMContentLoaded fired');
+            setTimeout(tryInitialization, 50);
         });
+        
+        window.addEventListener('load', () => {
+            debugLog('Window load fired');
+            setTimeout(tryInitialization, 100);
+        });
+        
+        // 追加の保険として遅延初期化
+        setTimeout(() => {
+            debugLog('Fallback initialization attempt');
+            tryInitialization();
+        }, 500);
+        
+        // Vercel環境用の最終保険
+        setTimeout(() => {
+            debugLog('Final fallback for Vercel environment');
+            if (!isInitialized) {
+                debugLog('Force initialization for Vercel');
+                setupFilenameControls();
+                setupDragAndDrop();
+                isInitialized = true;
+            }
+        }, 2000);
         
         // ファイル名コントロールの設定
         function setupFilenameControls() {
@@ -289,66 +345,93 @@
                 debugLog('ERROR: Filename control elements not found');
                 debugLog(`filenameSelect: ${!!filenameSelectElement}, filenameInput: ${!!filenameInputElement}, clearFilenameBtn: ${!!clearFilenameBtnElement}`);
                 
-                // リトライ機能を追加
+                // Vercel環境用により長い遅延でリトライ
                 setTimeout(() => {
                     debugLog('Retrying filename controls setup...');
                     setupFilenameControls();
-                }, 200);
+                }, 500);
                 return;
             }
             
             debugLog('All filename control elements found successfully');
             
-            // プルダウン選択時の動作
-            filenameSelectElement.addEventListener('change', function() {
+            // 既存のイベントリスナーをクリア（重複防止）
+            const newSelectElement = filenameSelectElement.cloneNode(true);
+            const newInputElement = filenameInputElement.cloneNode(true);
+            const newClearButton = clearFilenameBtnElement.cloneNode(true);
+            
+            filenameSelectElement.parentNode.replaceChild(newSelectElement, filenameSelectElement);
+            filenameInputElement.parentNode.replaceChild(newInputElement, filenameInputElement);
+            clearFilenameBtnElement.parentNode.replaceChild(newClearButton, clearFilenameBtnElement);
+            
+            // 新しい要素でイベントリスナーを設定
+            newSelectElement.addEventListener('change', function() {
                 debugLog(`Dropdown changed to: "${this.value}"`);
                 
                 if (this.value) {
-                    // 確実に実行するための遅延
+                    // Vercel環境用にやや長めの遅延
                     setTimeout(() => {
                         // プルダウンで選択された値を編集欄に設定
-                        filenameInputElement.value = this.value;
-                        debugLog(`Set input value to: "${filenameInputElement.value}"`);
-                        
-                        // フォーカスとカーソル位置設定
-                        filenameInputElement.focus();
-                        // 編集欄の末尾にカーソルを移動
-                        const valueLength = filenameInputElement.value.length;
-                        filenameInputElement.setSelectionRange(valueLength, valueLength);
-                        
-                        debugLog(`Filename selected from dropdown and set to edit field: ${this.value}`);
-                        updateMergeButton();
-                    }, 50);
+                        const currentInputElement = document.getElementById('filename');
+                        if (currentInputElement) {
+                            currentInputElement.value = this.value;
+                            debugLog(`Set input value to: "${currentInputElement.value}"`);
+                            
+                            // フォーカスとカーソル位置設定
+                            currentInputElement.focus();
+                            // 編集欄の末尾にカーソルを移動
+                            const valueLength = currentInputElement.value.length;
+                            currentInputElement.setSelectionRange(valueLength, valueLength);
+                            
+                            debugLog(`Filename selected from dropdown and set to edit field: ${this.value}`);
+                            updateMergeButton();
+                        } else {
+                            debugLog('ERROR: Input element not found during change event');
+                        }
+                    }, 100);
                 } else {
                     // 空の選択肢が選ばれた場合は編集欄をクリア
-                    filenameInputElement.value = '';
-                    debugLog('Dropdown selection cleared');
-                    updateMergeButton();
+                    const currentInputElement = document.getElementById('filename');
+                    if (currentInputElement) {
+                        currentInputElement.value = '';
+                        debugLog('Dropdown selection cleared');
+                        updateMergeButton();
+                    }
                 }
             });
             
             // クリアボタンの動作
-            clearFilenameBtnElement.addEventListener('click', function() {
+            newClearButton.addEventListener('click', function() {
                 // プルダウンと編集欄をクリア
-                filenameSelectElement.value = '';
-                filenameInputElement.value = '';
-                filenameInputElement.focus();
-                debugLog('Filename fields cleared');
-                updateMergeButton();
+                const currentSelectElement = document.getElementById('filename-select');
+                const currentInputElement = document.getElementById('filename');
+                
+                if (currentSelectElement && currentInputElement) {
+                    currentSelectElement.value = '';
+                    currentInputElement.value = '';
+                    currentInputElement.focus();
+                    debugLog('Filename fields cleared');
+                    updateMergeButton();
+                }
             });
             
             // 編集欄の変更監視
-            filenameInputElement.addEventListener('input', function() {
+            newInputElement.addEventListener('input', function() {
                 // 編集欄が変更されたらプルダウンをリセット
-                if (this.value.trim() !== filenameSelectElement.value) {
-                    // 選択された値と異なる場合はプルダウンをリセット
-                    filenameSelectElement.value = '';
+                const currentSelectElement = document.getElementById('filename-select');
+                if (currentSelectElement) {
+                    if (this.value.trim() !== currentSelectElement.value) {
+                        // 選択された値と異なる場合はプルダウンをリセット
+                        currentSelectElement.value = '';
+                    }
                 }
                 if (this.value.trim()) {
                     debugLog(`Filename edited: ${this.value}`);
                 }
                 updateMergeButton();
             });
+            
+            debugLog('Event listeners attached successfully to cloned elements');
         }
 
         // ドラッグ&ドロップの初期化関数
