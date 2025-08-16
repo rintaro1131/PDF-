@@ -204,6 +204,21 @@
                 debugInfo.scrollTop = debugInfo.scrollHeight;
             }
         }
+        
+        // ライブラリの読み込み確認
+        window.addEventListener('load', () => {
+            debugLog('Window loaded');
+            debugLog(`PDFLib available: ${typeof PDFLib !== 'undefined'}`);
+            debugLog(`XLSX available: ${typeof XLSX !== 'undefined'}`);
+            
+            if (typeof PDFLib !== 'undefined') {
+                debugLog(`PDFLib.PDFDocument: ${typeof PDFLib.PDFDocument}`);
+            }
+            if (typeof XLSX !== 'undefined') {
+                debugLog(`XLSX.read: ${typeof XLSX.read}`);
+                debugLog(`XLSX.utils: ${typeof XLSX.utils}`);
+            }
+        });
 
         // ドキュメント全体でのドラッグ&ドロップ防止（ブラウザでファイルが開かないように）
         document.addEventListener('dragover', (e) => {
@@ -400,102 +415,195 @@
         }
 
         async function convertExcelToPdf(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer);
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const htmlString = XLSX.utils.sheet_to_html(worksheet);
+            debugLog(`Starting Excel conversion for: ${file.name}`);
             
-            const pdfDoc = await PDFLib.PDFDocument.create();
-            const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
-            const { width, height } = page.getSize();
-            
-            // 簡易的なテキスト抽出（CSV形式で処理）
-            const csvData = XLSX.utils.sheet_to_csv(worksheet);
-            const lines = csvData.split('\n');
-            
-            let yPosition = height - 50;
-            const lineHeight = 20;
-            
-            for (const line of lines.slice(0, 35)) { // 最大35行まで
-                if (yPosition < 50) break;
-                page.drawText(line.substring(0, 80), { // 最大80文字まで
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                debugLog(`Excel file loaded, size: ${arrayBuffer.byteLength} bytes`);
+                
+                const workbook = XLSX.read(arrayBuffer);
+                debugLog(`Excel workbook parsed, sheets: ${workbook.SheetNames.length}`);
+                
+                if (workbook.SheetNames.length === 0) {
+                    throw new Error('Excelファイルにシートが見つかりません');
+                }
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                debugLog(`Processing sheet: ${firstSheetName}`);
+                
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
+                const { width, height } = page.getSize();
+                
+                // 簡易的なテキスト抽出（CSV形式で処理）
+                const csvData = XLSX.utils.sheet_to_csv(worksheet);
+                const lines = csvData.split('\n').filter(line => line.trim());
+                debugLog(`Excel data extracted, ${lines.length} lines`);
+                
+                let yPosition = height - 50;
+                const lineHeight = 20;
+                
+                // ヘッダー情報を追加
+                page.drawText(`Excelファイル: ${file.name}`, {
+                    x: 50,
+                    y: yPosition,
+                    size: 12
+                });
+                yPosition -= 30;
+                
+                page.drawText(`シート: ${firstSheetName}`, {
                     x: 50,
                     y: yPosition,
                     size: 10
                 });
-                yPosition -= lineHeight;
+                yPosition -= 30;
+                
+                for (const line of lines.slice(0, 30)) { // 最大30行まで
+                    if (yPosition < 50) break;
+                    const displayLine = line.substring(0, 80); // 最大80文字まで
+                    if (displayLine.trim()) {
+                        page.drawText(displayLine, {
+                            x: 50,
+                            y: yPosition,
+                            size: 8
+                        });
+                    }
+                    yPosition -= lineHeight;
+                }
+                
+                debugLog('Excel to PDF conversion completed');
+                return await pdfDoc.save();
+                
+            } catch (error) {
+                debugLog(`ERROR in Excel conversion: ${error.message}`);
+                throw new Error(`Excelファイルの変換に失敗しました: ${error.message}`);
             }
-            
-            return await pdfDoc.save();
         }
 
         async function convertWordToPdf(file) {
-            const pdfDoc = await PDFLib.PDFDocument.create();
-            const page = pdfDoc.addPage([595.28, 841.89]);
-            const { width, height } = page.getSize();
+            debugLog(`Starting Word conversion for: ${file.name}`);
             
-            // Word文書の場合は簡易的なファイル情報のみ表示
-            const info = [
-                `ファイル名: ${file.name}`,
-                `サイズ: ${formatFileSize(file.size)}`,
-                `タイプ: Word文書`,
-                '',
-                '※この文書は簡易変換されました。',
-                '正確な内容を確認するには元ファイルを開いてください。'
-            ];
-            
-            let yPosition = height - 100;
-            const lineHeight = 30;
-            
-            for (const line of info) {
-                page.drawText(line, {
-                    x: 50,
-                    y: yPosition,
-                    size: 14
-                });
-                yPosition -= lineHeight;
+            try {
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const page = pdfDoc.addPage([595.28, 841.89]);
+                const { width, height } = page.getSize();
+                
+                // Word文書の場合は簡易的なファイル情報のみ表示
+                const info = [
+                    `ファイル名: ${file.name}`,
+                    `サイズ: ${formatFileSize(file.size)}`,
+                    `タイプ: Word文書`,
+                    `最終更新: ${new Date(file.lastModified).toLocaleString()}`,
+                    '',
+                    '※この文書は簡易変換されました。',
+                    '正確な内容を確認するには元ファイルを開いてください。',
+                    '',
+                    'Word文書の内容をPDFに完全変換するには、',
+                    '商用ライブラリ（Nutrient、Apryse等）が必要です。'
+                ];
+                
+                let yPosition = height - 100;
+                const lineHeight = 30;
+                
+                for (const line of info) {
+                    page.drawText(line, {
+                        x: 50,
+                        y: yPosition,
+                        size: 12
+                    });
+                    yPosition -= lineHeight;
+                }
+                
+                debugLog('Word to PDF conversion completed');
+                return await pdfDoc.save();
+                
+            } catch (error) {
+                debugLog(`ERROR in Word conversion: ${error.message}`);
+                throw new Error(`Wordファイルの変換に失敗しました: ${error.message}`);
             }
-            
-            return await pdfDoc.save();
         }
 
         async function mergePDFs() {
-            if (documentFiles.length === 0) return;
+            if (documentFiles.length === 0) {
+                debugLog('ERROR: No files to merge');
+                return;
+            }
+
+            debugLog(`Starting merge process with ${documentFiles.length} files`);
 
             try {
                 mergeBtn.disabled = true;
                 mergeBtn.textContent = '変換・結合中...';
                 status.textContent = 'ファイルを処理しています...';
 
+                // ライブラリの可用性を再確認
+                if (typeof PDFLib === 'undefined') {
+                    throw new Error('PDFLib is not loaded');
+                }
+                if (typeof XLSX === 'undefined') {
+                    throw new Error('XLSX is not loaded');
+                }
+
+                debugLog('Creating merged PDF document');
                 const mergedPdf = await PDFLib.PDFDocument.create();
 
                 for (let i = 0; i < documentFiles.length; i++) {
                     const file = documentFiles[i];
                     const fileName = file.name.toLowerCase();
+                    debugLog(`Processing file ${i + 1}/${documentFiles.length}: ${file.name}`);
                     status.textContent = `ファイルを処理しています... (${i + 1}/${documentFiles.length})`;
                     
                     let pdfBytes;
                     
-                    if (fileName.endsWith('.pdf')) {
-                        pdfBytes = await file.arrayBuffer();
-                    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                        pdfBytes = await convertExcelToPdf(file);
-                    } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-                        pdfBytes = await convertWordToPdf(file);
-                    } else {
-                        continue; // 対応外ファイルはスキップ
+                    try {
+                        if (fileName.endsWith('.pdf')) {
+                            debugLog(`Loading PDF file: ${file.name}`);
+                            pdfBytes = await file.arrayBuffer();
+                            debugLog(`PDF arrayBuffer size: ${pdfBytes.byteLength} bytes`);
+                        } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                            debugLog(`Converting Excel file: ${file.name}`);
+                            pdfBytes = await convertExcelToPdf(file);
+                            debugLog(`Excel converted to PDF, size: ${pdfBytes.byteLength} bytes`);
+                        } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                            debugLog(`Converting Word file: ${file.name}`);
+                            pdfBytes = await convertWordToPdf(file);
+                            debugLog(`Word converted to PDF, size: ${pdfBytes.byteLength} bytes`);
+                        } else {
+                            debugLog(`Skipping unsupported file: ${file.name}`);
+                            continue; // 対応外ファイルはスキップ
+                        }
+                        
+                        debugLog(`Loading PDF document from bytes`);
+                        const pdf = await PDFLib.PDFDocument.load(pdfBytes);
+                        const pageCount = pdf.getPageCount();
+                        debugLog(`PDF loaded successfully, pages: ${pageCount}`);
+                        
+                        const pageIndices = Array.from({length: pageCount}, (_, i) => i);
+                        debugLog(`Copying ${pageCount} pages`);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pageIndices);
+                        
+                        copiedPages.forEach((page) => mergedPdf.addPage(page));
+                        debugLog(`Pages added to merged document`);
+                        
+                    } catch (fileError) {
+                        debugLog(`ERROR processing file ${file.name}: ${fileError.message}`);
+                        console.error(`Error processing file ${file.name}:`, fileError);
+                        
+                        // ファイル固有のエラー処理
+                        if (fileError.message.includes('Invalid PDF')) {
+                            throw new Error(`ファイル "${file.name}" は有効なPDFではありません。`);
+                        } else if (fileError.message.includes('encrypted')) {
+                            throw new Error(`ファイル "${file.name}" は暗号化されています。`);
+                        } else {
+                            throw new Error(`ファイル "${file.name}" の処理中にエラーが発生しました: ${fileError.message}`);
+                        }
                     }
-                    
-                    const pdf = await PDFLib.PDFDocument.load(pdfBytes);
-                    const pageCount = pdf.getPageCount();
-                    const pageIndices = Array.from({length: pageCount}, (_, i) => i);
-                    const copiedPages = await mergedPdf.copyPages(pdf, pageIndices);
-                    
-                    copiedPages.forEach((page) => mergedPdf.addPage(page));
                 }
 
+                debugLog('Saving merged PDF');
                 const mergedPdfBytes = await mergedPdf.save();
+                debugLog(`Merged PDF saved, size: ${mergedPdfBytes.byteLength} bytes`);
                 
                 let filename = filenameInput.value.trim();
                 if (!filename) {
@@ -506,6 +614,7 @@
                     filename += '.pdf';
                 }
 
+                debugLog(`Creating download for: ${filename}`);
                 const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -517,15 +626,35 @@
                 URL.revokeObjectURL(url);
 
                 status.textContent = `結合完了: ${filename} をダウンロードしました`;
+                debugLog('Merge process completed successfully');
                 
             } catch (error) {
+                debugLog(`CRITICAL ERROR: ${error.message}`);
                 console.error('文書結合エラー:', error);
-                alert('文書結合に失敗しました。暗号化ファイルや破損したファイルが含まれている可能性があります。');
+                
+                // より詳細なエラーメッセージ
+                let errorMessage = '文書結合に失敗しました。';
+                if (error.message.includes('PDFLib is not loaded')) {
+                    errorMessage += ' PDFライブラリが読み込まれていません。ページを再読み込みしてください。';
+                } else if (error.message.includes('XLSX is not loaded')) {
+                    errorMessage += ' Excelライブラリが読み込まれていません。ページを再読み込みしてください。';
+                } else if (error.message.includes('暗号化')) {
+                    errorMessage = error.message;
+                } else if (error.message.includes('有効なPDF')) {
+                    errorMessage = error.message;
+                } else if (error.message.includes('の処理中に')) {
+                    errorMessage = error.message;
+                } else {
+                    errorMessage += ` エラー詳細: ${error.message}`;
+                }
+                
+                alert(errorMessage);
                 status.textContent = '文書結合に失敗しました';
             } finally {
                 mergeBtn.disabled = false;
                 mergeBtn.textContent = 'PDF結合実行';
                 updateMergeButton();
+                debugLog('Merge process finished');
             }
         }
     </script>
