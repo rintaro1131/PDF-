@@ -1,0 +1,195 @@
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --bg: #f7f8fa;
+  --card: #fff;
+  --border: #e5e7eb;
+  --text: #111;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --err: #dc2626;
+  --radius: 14px;
+  --space: 12px;
+}
+
+body {
+  background: var(--bg);
+  margin: 24px;
+  display: flex;
+  justify-content: center;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.container {
+  width: min(720px, 100%);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.subtle-note {
+  color: var(--muted);
+  margin: 0 0 20px;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid var(--warn);
+}
+
+label {
+  display: block;
+  margin: 16px 0 6px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+input[type="text"],
+input[type="file"],
+select,
+button {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+input[type="text"],
+select {
+  background: white;
+}
+
+button {
+  background: #f9fafb;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+button:hover {
+  background: #eef2ff;
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5;
+}
+
+button:disabled:hover {
+  background: #f5f5f5;
+  border-color: var(--border);
+}
+
+button:focus,
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+li {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.drop {
+  margin-top: 12px;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  background: #fafbfc;
+  user-select: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.drop.dragover {
+  background: #eef6ff;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.status {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.status.warn {
+  color: var(--warn);
+}
+
+.status.error {
+  color: var(--err);
+}
+
+/* セクション間の余白調整 */
+.card > * + * {
+  margin-top: 16px;
+}
+
+/* ボタンのサイズ統一 */
+li button {
+  padding: 2px 8px;
+  font-size: 12px;
+  min-width: 28px;
+  text-align: center;
+}
+
+/* ファイル入力のスタイル改善 */
+input[type="file"] {
+  width: 100%;
+  background: white;
+}
+
+/* プリセット選択とテキスト入力の調整 */
+.row label {
+  margin: 0;
+  font-size: 14px;
+}
+
+.row input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+}

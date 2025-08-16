@@ -65,7 +65,12 @@
       if (isPdf) files.push(f); else skipped++;
     }
     renderList();
-    if (skipped > 0) statusEl.textContent = `PDF以外 ${skipped} 件は無視しました`;
+    if (skipped > 0) {
+      statusEl.textContent = `PDF以外 ${skipped} 件は無視しました`;
+      statusEl.className = 'status warn';
+    } else {
+      statusEl.className = 'status';
+    }
   }
 
   filesEl.addEventListener('change', () => {
@@ -110,6 +115,7 @@
     try {
       mergeEl.disabled = true;
       statusEl.textContent = '結合中…';
+      statusEl.className = 'status';
 
       const { PDFDocument } = window.PDFLib;
       if (!PDFDocument) throw new Error('pdf-libが読み込まれていません');
@@ -130,6 +136,7 @@
 
       if (merged.getPageCount() === 0) {
         statusEl.textContent = '失敗しました';
+        statusEl.className = 'status error';
         alert('すべてのPDFの読み込みに失敗しました（暗号化/破損/サイズ過大など）');
         return;
       }
@@ -145,16 +152,18 @@
       a.remove();
       URL.revokeObjectURL(url);
 
-      statusEl.textContent = failed.length > 0
-        ? `完了（一部スキップ: ${failed.length} 件）`
-        : '完了';
-
       if (failed.length > 0) {
+        statusEl.textContent = `完了（一部スキップ: ${failed.length} 件）`;
+        statusEl.className = 'status warn';
         alert('読み込みに失敗したファイル:\n' + failed.join('\n'));
+      } else {
+        statusEl.textContent = '完了';
+        statusEl.className = 'status ok';
       }
     } catch (e) {
       console.error(e);
       statusEl.textContent = '失敗しました';
+      statusEl.className = 'status error';
       alert('結合に失敗しました（暗号化/破損/サイズ過大など）');
     } finally {
       mergeEl.disabled = files.length === 0;

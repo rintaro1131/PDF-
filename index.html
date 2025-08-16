@@ -3,24 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PDF結合（CSP対応・外部JS）</title>
+  <title>月末書類用PDF結合アプリ</title>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'">
-  <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif; }
-    body { margin: 24px; max-width: 720px; }
-    label { display:block; margin: 12px 0 4px; }
-    input[type="text"], input[type="file"], button, select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 8px; }
-    button { cursor: pointer; background: #f7f7f7; }
-    .muted { color:#666; font-size: 13px; }
-    ul { padding-left: 20px; }
-    li { margin: 4px 0; }
-    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .drop { margin-top: 10px; border: 2px dashed #bbb; border-radius: 8px; padding: 18px; text-align: center; user-select: none; }
-    .drop.dragover { background: #f0f7ff; border-color: #7aa7ff; }
-  </style>
+  <link rel="stylesheet" href="./app.css">
 </head>
 <body>
-  <h1>PDF結合（最小構成）</h1>
+  <div class="container">
+    <div class="card">
+      <h1>月末書類用PDF結合アプリ</h1>
+      <p class="subtle-note">エクセルやワードファイルは結合できません。PDFに変換してから使ってください。</p>
 
   <label>PDFファイルを選択（複数可）</label>
   <input id="files" type="file" accept="application/pdf,.pdf" multiple />
@@ -54,7 +45,9 @@
     <div class="muted">各行の ▲/▼ で並べ替え、× で削除できます。</div>
   </div>
 
-  <p class="muted" style="margin-top:16px;">注意: 暗号化PDFは読み込みに失敗する場合があります。処理は端末内（ブラウザ）だけで行い、サーバーへ送信しません。</p>
+      <p class="muted" style="margin-top:16px;">注意: 暗号化PDFは読み込みに失敗する場合があります。処理は端末内（ブラウザ）だけで行い、サーバーへ送信しません。</p>
+    </div>
+  </div>
 
   <script src="./lib/pdf-lib.min.js"></script>
   <script src="./app.js" defer></script>
