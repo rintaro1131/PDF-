@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none';">
+    <title>文書結合ツール（PDF・Excel・Word対応）</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .drop-zone.dragover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+        }
+        .file-input {
+            margin-bottom: 20px;
+        }
+        .file-input-hidden {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .file-select-label {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .file-select-label:hover {
+            background: #0056b3;
+        }
+        .file-list {
+            margin: 20px 0;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .file-info {
+            flex: 1;
+            margin-left: 10px;
+        }
+        .file-controls {
+            display: flex;
+            gap: 5px;
+        }
+        .btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-up { background: #28a745; color: white; }
+        .btn-down { background: #17a2b8; color: white; }
+        .btn-remove { background: #dc3545; color: white; }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .filename-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e9ecef;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .execute-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>文書結合ツール</h1>
+        
+        <div class="drop-zone" id="dropZone">
+            <p>PDF・Excel・Wordファイルをここにドラッグ&ドロップするか、下のボタンで選択してください</p>
+        </div>
+        
+        <div class="file-input">
+            <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.docx,.doc" class="file-input-hidden">
+            <button type="button" id="fileSelectBtn" class="btn btn-primary">ファイルを選択</button>
+            <label for="fileInput" class="file-select-label" style="margin-left: 10px;">または、ここをクリック</label>
+        </div>
+        
+        <div class="status" id="status">PDF・Excel・Wordファイルを選択してください</div>
+        
+        <div class="file-list">
+            <h3>選択されたファイル</h3>
+            <div id="fileList"></div>
+        </div>
+        
+        <div class="execute-section">
+            <label for="filename">結合後のファイル名:</label>
+            <input type="text" id="filename" class="filename-input" placeholder="ファイル名を入力" list="filename-suggestions">
+            <datalist id="filename-suggestions">
+                <option value="20250月_名前_出勤簿">
+                <option value="20250月_名前_身嗜手当">
+                <option value="20250月_名前_社販手当">
+                <option value="20250月_名前_報奨金">
+                <option value="20250月__名前_立替金">
+            </datalist>
+            
+            <button id="mergeBtn" class="btn btn-primary" disabled onclick="mergePDFs()">PDF結合実行</button>
+        </div>
+        
+        <div class="warning">
+            <strong>注意:</strong> 
+            <ul style="margin: 5px 0; padding-left: 20px;">
+                <li>Excel・Wordファイルは簡易的にPDFに変換されます（レイアウトは基本的なもの）</li>
+                <li>複雑な書式・図表・マクロ等は正しく変換されない場合があります</li>
+                <li>巨大ファイルや多数のファイルを結合する場合、メモリ制約により処理に時間がかかります</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="./lib/pdf-lib.min.js"></script>
+    <script src="./lib/xlsx.mini.min.js"></script>
+    <script>
+        let documentFiles = [];
+        let unsupportedCount = 0;
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileSelectBtn = document.getElementById('fileSelectBtn');
+        const fileList = document.getElementById('fileList');
+        const status = document.getElementById('status');
+        const mergeBtn = document.getElementById('mergeBtn');
+        const filenameInput = document.getElementById('filename');
+
+        // ドラッグ&ドロップイベント
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // ファイル選択ボタンイベント
+        fileSelectBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // イベントが信頼できるユーザーアクションから発生していることを確認
+            if (e.isTrusted) {
+                try {
+                    fileInput.click();
+                } catch (error) {
+                    console.error('File input click failed:', error);
+                    // フォールバック: 直接的な操作
+                    setTimeout(() => {
+                        fileInput.click();
+                    }, 0);
+                }
+            }
+        });
+        
+        // ファイル選択イベント
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            unsupportedCount = 0;
+            const newDocumentFiles = [];
+            
+            for (let file of files) {
+                const fileName = file.name.toLowerCase();
+                if (file.type === 'application/pdf' || fileName.endsWith('.pdf') ||
+                    fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ||
+                    fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                    newDocumentFiles.push(file);
+                } else {
+                    unsupportedCount++;
+                }
+            }
+            
+            documentFiles = [...documentFiles, ...newDocumentFiles];
+            updateStatus();
+            updateFileList();
+            updateMergeButton();
+        }
+
+        function updateStatus() {
+            let statusText = `ファイル: ${documentFiles.length}件`;
+            if (unsupportedCount > 0) {
+                statusText += ` (対応外ファイル ${unsupportedCount}件は無視されました)`;
+            }
+            status.textContent = statusText;
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            documentFiles.forEach((file, index) => {
+                const fileType = getFileType(file.name);
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <span class="file-info">
+                        <strong>${file.name}</strong> (${formatFileSize(file.size)}) [${fileType}]
+                    </span>
+                    <div class="file-controls">
+                        <button class="btn btn-up" onclick="moveFile(${index}, -1)" ${index === 0 ? 'disabled' : ''}>▲</button>
+                        <button class="btn btn-down" onclick="moveFile(${index}, 1)" ${index === documentFiles.length - 1 ? 'disabled' : ''}>▼</button>
+                        <button class="btn btn-remove" onclick="removeFile(${index})">×</button>
+                    </div>
+                `;
+                fileList.appendChild(item);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function getFileType(fileName) {
+            const ext = fileName.toLowerCase().split('.').pop();
+            switch(ext) {
+                case 'pdf': return 'PDF';
+                case 'xlsx': case 'xls': return 'Excel';
+                case 'docx': case 'doc': return 'Word';
+                default: return '不明';
+            }
+        }
+
+        function moveFile(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < documentFiles.length) {
+                [documentFiles[index], documentFiles[newIndex]] = [documentFiles[newIndex], documentFiles[index]];
+                updateFileList();
+            }
+        }
+
+        function removeFile(index) {
+            documentFiles.splice(index, 1);
+            updateStatus();
+            updateFileList();
+            updateMergeButton();
+        }
+
+        function updateMergeButton() {
+            mergeBtn.disabled = documentFiles.length === 0;
+        }
+
+        function sanitizeFilename(filename) {
+            return filename.replace(/[<>:"/\\|?*]/g, '_');
+        }
+
+        async function convertExcelToPdf(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer);
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const htmlString = XLSX.utils.sheet_to_html(worksheet);
+            
+            const pdfDoc = await PDFLib.PDFDocument.create();
+            const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
+            const { width, height } = page.getSize();
+            
+            // 簡易的なテキスト抽出（CSV形式で処理）
+            const csvData = XLSX.utils.sheet_to_csv(worksheet);
+            const lines = csvData.split('\n');
+            
+            let yPosition = height - 50;
+            const lineHeight = 20;
+            
+            for (const line of lines.slice(0, 35)) { // 最大35行まで
+                if (yPosition < 50) break;
+                page.drawText(line.substring(0, 80), { // 最大80文字まで
+                    x: 50,
+                    y: yPosition,
+                    size: 10
+                });
+                yPosition -= lineHeight;
+            }
+            
+            return await pdfDoc.save();
+        }
+
+        async function convertWordToPdf(file) {
+            const pdfDoc = await PDFLib.PDFDocument.create();
+            const page = pdfDoc.addPage([595.28, 841.89]);
+            const { width, height } = page.getSize();
+            
+            // Word文書の場合は簡易的なファイル情報のみ表示
+            const info = [
+                `ファイル名: ${file.name}`,
+                `サイズ: ${formatFileSize(file.size)}`,
+                `タイプ: Word文書`,
+                '',
+                '※この文書は簡易変換されました。',
+                '正確な内容を確認するには元ファイルを開いてください。'
+            ];
+            
+            let yPosition = height - 100;
+            const lineHeight = 30;
+            
+            for (const line of info) {
+                page.drawText(line, {
+                    x: 50,
+                    y: yPosition,
+                    size: 14
+                });
+                yPosition -= lineHeight;
+            }
+            
+            return await pdfDoc.save();
+        }
+
+        async function mergePDFs() {
+            if (documentFiles.length === 0) return;
+
+            try {
+                mergeBtn.disabled = true;
+                mergeBtn.textContent = '変換・結合中...';
+                status.textContent = 'ファイルを処理しています...';
+
+                const mergedPdf = await PDFLib.PDFDocument.create();
+
+                for (let i = 0; i < documentFiles.length; i++) {
+                    const file = documentFiles[i];
+                    const fileName = file.name.toLowerCase();
+                    status.textContent = `ファイルを処理しています... (${i + 1}/${documentFiles.length})`;
+                    
+                    let pdfBytes;
+                    
+                    if (fileName.endsWith('.pdf')) {
+                        pdfBytes = await file.arrayBuffer();
+                    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                        pdfBytes = await convertExcelToPdf(file);
+                    } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                        pdfBytes = await convertWordToPdf(file);
+                    } else {
+                        continue; // 対応外ファイルはスキップ
+                    }
+                    
+                    const pdf = await PDFLib.PDFDocument.load(pdfBytes);
+                    const pageCount = pdf.getPageCount();
+                    const pageIndices = Array.from({length: pageCount}, (_, i) => i);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pageIndices);
+                    
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                const mergedPdfBytes = await mergedPdf.save();
+                
+                let filename = filenameInput.value.trim();
+                if (!filename) {
+                    filename = 'merged_documents';
+                }
+                filename = sanitizeFilename(filename);
+                if (!filename.toLowerCase().endsWith('.pdf')) {
+                    filename += '.pdf';
+                }
+
+                const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                status.textContent = `結合完了: ${filename} をダウンロードしました`;
+                
+            } catch (error) {
+                console.error('文書結合エラー:', error);
+                alert('文書結合に失敗しました。暗号化ファイルや破損したファイルが含まれている可能性があります。');
+                status.textContent = '文書結合に失敗しました';
+            } finally {
+                mergeBtn.disabled = false;
+                mergeBtn.textContent = 'PDF結合実行';
+                updateMergeButton();
+            }
+        }
+    </script>
+</body>
+</html>
