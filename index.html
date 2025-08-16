@@ -265,48 +265,84 @@
                 debugLog(`PDFLib.PDFDocument: ${typeof PDFLib.PDFDocument}`);
             }
             
-            // ファイル名操作の初期化
-            setupFilenameControls();
-            
-            // ドラッグ&ドロップイベントの初期化
-            setupDragAndDrop();
+            // DOM要素が確実に準備できるように遅延実行
+            setTimeout(() => {
+                // ファイル名操作の初期化
+                setupFilenameControls();
+                
+                // ドラッグ&ドロップイベントの初期化
+                setupDragAndDrop();
+            }, 100);
         });
         
         // ファイル名コントロールの設定
         function setupFilenameControls() {
+            debugLog('Setting up filename controls');
+            
+            // 要素を再取得して確実に存在確認
+            const filenameSelectElement = document.getElementById('filename-select');
+            const filenameInputElement = document.getElementById('filename');
+            const clearFilenameBtnElement = document.getElementById('clear-filename-btn');
+            
+            // 要素の存在確認
+            if (!filenameSelectElement || !filenameInputElement || !clearFilenameBtnElement) {
+                debugLog('ERROR: Filename control elements not found');
+                debugLog(`filenameSelect: ${!!filenameSelectElement}, filenameInput: ${!!filenameInputElement}, clearFilenameBtn: ${!!clearFilenameBtnElement}`);
+                
+                // リトライ機能を追加
+                setTimeout(() => {
+                    debugLog('Retrying filename controls setup...');
+                    setupFilenameControls();
+                }, 200);
+                return;
+            }
+            
+            debugLog('All filename control elements found successfully');
+            
             // プルダウン選択時の動作
-            filenameSelect.addEventListener('change', function() {
+            filenameSelectElement.addEventListener('change', function() {
+                debugLog(`Dropdown changed to: "${this.value}"`);
+                
                 if (this.value) {
-                    // プルダウンで選択された値を編集欄に設定
-                    filenameInput.value = this.value;
-                    filenameInput.focus();
-                    // 編集欄の末尾にカーソルを移動
-                    filenameInput.setSelectionRange(filenameInput.value.length, filenameInput.value.length);
-                    debugLog(`Filename selected from dropdown and set to edit field: ${this.value}`);
+                    // 確実に実行するための遅延
+                    setTimeout(() => {
+                        // プルダウンで選択された値を編集欄に設定
+                        filenameInputElement.value = this.value;
+                        debugLog(`Set input value to: "${filenameInputElement.value}"`);
+                        
+                        // フォーカスとカーソル位置設定
+                        filenameInputElement.focus();
+                        // 編集欄の末尾にカーソルを移動
+                        const valueLength = filenameInputElement.value.length;
+                        filenameInputElement.setSelectionRange(valueLength, valueLength);
+                        
+                        debugLog(`Filename selected from dropdown and set to edit field: ${this.value}`);
+                        updateMergeButton();
+                    }, 50);
                 } else {
                     // 空の選択肢が選ばれた場合は編集欄をクリア
-                    filenameInput.value = '';
+                    filenameInputElement.value = '';
                     debugLog('Dropdown selection cleared');
+                    updateMergeButton();
                 }
-                updateMergeButton();
             });
             
             // クリアボタンの動作
-            clearFilenameBtn.addEventListener('click', function() {
+            clearFilenameBtnElement.addEventListener('click', function() {
                 // プルダウンと編集欄をクリア
-                filenameSelect.value = '';
-                filenameInput.value = '';
-                filenameInput.focus();
+                filenameSelectElement.value = '';
+                filenameInputElement.value = '';
+                filenameInputElement.focus();
                 debugLog('Filename fields cleared');
                 updateMergeButton();
             });
             
             // 編集欄の変更監視
-            filenameInput.addEventListener('input', function() {
+            filenameInputElement.addEventListener('input', function() {
                 // 編集欄が変更されたらプルダウンをリセット
-                if (this.value.trim() !== filenameSelect.value) {
+                if (this.value.trim() !== filenameSelectElement.value) {
                     // 選択された値と異なる場合はプルダウンをリセット
-                    filenameSelect.value = '';
+                    filenameSelectElement.value = '';
                 }
                 if (this.value.trim()) {
                     debugLog(`Filename edited: ${this.value}`);
