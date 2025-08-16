@@ -175,7 +175,7 @@
     </div>
 
     <script src="./lib/pdf-lib.min.js"></script>
-    <script src="./lib/xlsx.mini.min.js"></script>
+    <script src="./lib/xlsx.full.min.js"></script>
     <script>
         let documentFiles = [];
         let unsupportedCount = 0;
@@ -471,13 +471,38 @@
                 const arrayBuffer = await file.arrayBuffer();
                 debugLog(`Excel file loaded, size: ${arrayBuffer.byteLength} bytes`);
                 
-                const workbook = XLSX.read(arrayBuffer);
-                debugLog(`Excel workbook parsed, sheets: ${workbook.SheetNames.length}`);
+                // XLSXライブラリの確認
+                if (typeof XLSX === 'undefined') {
+                    throw new Error('XLSX library not loaded');
+                }
                 
-                if (workbook.SheetNames.length === 0) {
+                debugLog(`XLSX library version: ${XLSX.version || 'unknown'}`);
+                
+                let workbook;
+                try {
+                    // .xls と .xlsx 両方に対応する読み込み設定
+                    workbook = XLSX.read(arrayBuffer, {
+                        type: 'array',
+                        cellDates: true,
+                        cellNF: false,
+                        cellStyles: false,
+                        sheetStubs: true,
+                        password: ""
+                    });
+                    debugLog(`Excel workbook parsed successfully`);
+                } catch (parseError) {
+                    debugLog(`Parse error: ${parseError.message}`);
+                    if (parseError.message.includes('parse_xlscfb')) {
+                        throw new Error('この.xlsファイル形式はサポートされていません。.xlsxファイルに変換してお試しください。');
+                    }
+                    throw parseError;
+                }
+                
+                if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
                     throw new Error('Excelファイルにシートが見つかりません');
                 }
                 
+                debugLog(`Excel workbook parsed, sheets: ${workbook.SheetNames.length}`);
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 debugLog(`Processing sheet: ${firstSheetName}`);
@@ -485,11 +510,6 @@
                 const pdfDoc = await PDFLib.PDFDocument.create();
                 const page = pdfDoc.addPage([595.28, 841.89]); // A4サイズ
                 const { width, height } = page.getSize();
-                
-                // 簡易的なテキスト抽出（CSV形式で処理）
-                const csvData = XLSX.utils.sheet_to_csv(worksheet);
-                const lines = csvData.split('\n').filter(line => line.trim());
-                debugLog(`Excel data extracted, ${lines.length} lines`);
                 
                 let yPosition = height - 50;
                 const lineHeight = 20;
@@ -509,17 +529,60 @@
                 });
                 yPosition -= 30;
                 
-                for (const line of lines.slice(0, 30)) { // 最大30行まで
-                    if (yPosition < 50) break;
-                    const displayLine = line.substring(0, 80); // 最大80文字まで
-                    if (displayLine.trim()) {
-                        await drawTextSafely(page, displayLine, {
+                // データの抽出とPDF化
+                try {
+                    // CSVとしてデータを抽出
+                    const csvData = XLSX.utils.sheet_to_csv(worksheet, {
+                        FS: ',',
+                        RS: '\n',
+                        forceQuotes: false,
+                        skipHidden: false
+                    });
+                    
+                    const lines = csvData.split('\n').filter(line => line.trim());
+                    debugLog(`Excel data extracted, ${lines.length} lines`);
+                    
+                    if (lines.length === 0) {
+                        await drawTextSafely(page, 'No data found in this sheet', {
                             x: 50,
                             y: yPosition,
-                            size: 8
+                            size: 10
                         });
+                    } else {
+                        for (const line of lines.slice(0, 30)) { // 最大30行まで
+                            if (yPosition < 50) break;
+                            const displayLine = line.substring(0, 80); // 最大80文字まで
+                            if (displayLine.trim()) {
+                                await drawTextSafely(page, displayLine, {
+                                    x: 50,
+                                    y: yPosition,
+                                    size: 8
+                                });
+                            }
+                            yPosition -= lineHeight;
+                        }
+                        
+                        if (lines.length > 30) {
+                            await drawTextSafely(page, `... and ${lines.length - 30} more rows`, {
+                                x: 50,
+                                y: yPosition - 10,
+                                size: 8
+                            });
+                        }
                     }
-                    yPosition -= lineHeight;
+                } catch (dataError) {
+                    debugLog(`Data extraction error: ${dataError.message}`);
+                    await drawTextSafely(page, 'Error reading Excel data - file may be corrupted or protected', {
+                        x: 50,
+                        y: yPosition,
+                        size: 10
+                    });
+                    yPosition -= 30;
+                    await drawTextSafely(page, `Error details: ${dataError.message}`, {
+                        x: 50,
+                        y: yPosition,
+                        size: 8
+                    });
                 }
                 
                 debugLog('Excel to PDF conversion completed');
@@ -527,7 +590,19 @@
                 
             } catch (error) {
                 debugLog(`ERROR in Excel conversion: ${error.message}`);
-                throw new Error(`Excelファイルの変換に失敗しました: ${error.message}`);
+                
+                // より詳細なエラーメッセージ
+                if (error.message.includes('XLSX library not loaded')) {
+                    throw new Error('Excel処理ライブラリが読み込まれていません。ページを再読み込みしてください。');
+                } else if (error.message.includes('parse_xlscfb')) {
+                    throw new Error('古い.xlsファイル形式はサポートされていません。Excelで.xlsxに変換してお試しください。');
+                } else if (error.message.includes('Unsupported file')) {
+                    throw new Error('サポートされていないExcelファイル形式です。');
+                } else if (error.message.includes('password')) {
+                    throw new Error('パスワード保護されたExcelファイルは処理できません。');
+                } else {
+                    throw new Error(`Excelファイルの変換に失敗しました: ${error.message}`);
+                }
             }
         }
 
