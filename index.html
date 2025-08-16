@@ -413,6 +413,56 @@
         function sanitizeFilename(filename) {
             return filename.replace(/[<>:"/\\|?*]/g, '_');
         }
+        
+        // 日本語文字を安全にPDFに描画するためのヘルパー関数
+        function sanitizeTextForPdf(text) {
+            debugLog(`Sanitizing text: ${text.substring(0, 30)}...`);
+            
+            // まずはローマ字に変換を試行
+            let result = text
+                // 一般的な日本語単語の置換
+                .replace(/申請書/g, 'shinseisho')
+                .replace(/手当/g, 'teate')
+                .replace(/身嗜み/g, 'midashinami')
+                .replace(/出勤簿/g, 'shukkinbo')
+                .replace(/報奨金/g, 'hoshokin')
+                .replace(/立替金/g, 'tatekaekin')
+                .replace(/社販/g, 'shahan')
+                // 一般的なひらがな
+                .replace(/です/g, 'desu')
+                .replace(/ます/g, 'masu')
+                .replace(/ファイル/g, 'file')
+                .replace(/フォルダ/g, 'folder')
+                .replace(/サイズ/g, 'size')
+                .replace(/タイプ/g, 'type')
+                // 残りの文字を安全な文字に置換
+                .replace(/[あ-ん]/g, (match) => `[hiragana]`) // ひらがな
+                .replace(/[ア-ン]/g, (match) => `[katakana]`) // カタカナ
+                .replace(/[一-龯]/g, (match) => `[kanji]`) // 漢字
+                .replace(/[^\x00-\xFF]/g, '?'); // その他の非ASCII文字
+                
+            debugLog(`Sanitized result: ${result.substring(0, 30)}...`);
+            return result;
+        }
+        
+        // PDF-libで安全にテキストを描画する関数
+        async function drawTextSafely(page, text, options) {
+            try {
+                // まず元のテキストで試行
+                page.drawText(text, options);
+                debugLog(`Text drawn successfully: ${text.substring(0, 20)}...`);
+            } catch (error) {
+                if (error.message.includes('WinAnsi cannot encode')) {
+                    debugLog(`WinAnsi encoding error, using fallback for: ${text.substring(0, 20)}...`);
+                    // フォールバック: 安全な文字に置換
+                    const safeText = sanitizeTextForPdf(text);
+                    page.drawText(safeText, options);
+                    debugLog(`Fallback text drawn: ${safeText.substring(0, 20)}...`);
+                } else {
+                    throw error; // その他のエラーは再スロー
+                }
+            }
+        }
 
         async function convertExcelToPdf(file) {
             debugLog(`Starting Excel conversion for: ${file.name}`);
@@ -445,14 +495,14 @@
                 const lineHeight = 20;
                 
                 // ヘッダー情報を追加
-                page.drawText(`Excelファイル: ${file.name}`, {
+                await drawTextSafely(page, `Excel file: ${file.name}`, {
                     x: 50,
                     y: yPosition,
                     size: 12
                 });
                 yPosition -= 30;
                 
-                page.drawText(`シート: ${firstSheetName}`, {
+                await drawTextSafely(page, `Sheet: ${firstSheetName}`, {
                     x: 50,
                     y: yPosition,
                     size: 10
@@ -463,7 +513,7 @@
                     if (yPosition < 50) break;
                     const displayLine = line.substring(0, 80); // 最大80文字まで
                     if (displayLine.trim()) {
-                        page.drawText(displayLine, {
+                        await drawTextSafely(page, displayLine, {
                             x: 50,
                             y: yPosition,
                             size: 8
@@ -489,25 +539,25 @@
                 const page = pdfDoc.addPage([595.28, 841.89]);
                 const { width, height } = page.getSize();
                 
-                // Word文書の場合は簡易的なファイル情報のみ表示
+                // Word文書の場合は簡易的なファイル情報のみ表示（日本語を英語に変更）
                 const info = [
-                    `ファイル名: ${file.name}`,
-                    `サイズ: ${formatFileSize(file.size)}`,
-                    `タイプ: Word文書`,
-                    `最終更新: ${new Date(file.lastModified).toLocaleString()}`,
+                    `Filename: ${file.name}`,
+                    `Size: ${formatFileSize(file.size)}`,
+                    `Type: Word Document`,
+                    `Last Modified: ${new Date(file.lastModified).toLocaleString()}`,
                     '',
-                    '※この文書は簡易変換されました。',
-                    '正確な内容を確認するには元ファイルを開いてください。',
+                    '* This document was converted in simplified mode.',
+                    'Please open the original file for accurate content.',
                     '',
-                    'Word文書の内容をPDFに完全変換するには、',
-                    '商用ライブラリ（Nutrient、Apryse等）が必要です。'
+                    'For complete Word to PDF conversion with Japanese text,',
+                    'commercial libraries (Nutrient, Apryse, etc.) are required.'
                 ];
                 
                 let yPosition = height - 100;
                 const lineHeight = 30;
                 
                 for (const line of info) {
-                    page.drawText(line, {
+                    await drawTextSafely(page, line, {
                         x: 50,
                         y: yPosition,
                         size: 12
