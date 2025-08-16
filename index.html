@@ -143,6 +143,7 @@
         </div>
         
         <div class="status" id="status">PDF・Excel・Wordファイルを選択してください</div>
+        <div id="debugInfo" style="display: none; background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #dee2e6;"></div>
         
         <div class="file-list">
             <h3>選択されたファイル</h3>
@@ -186,63 +187,146 @@
         const status = document.getElementById('status');
         const mergeBtn = document.getElementById('mergeBtn');
         const filenameInput = document.getElementById('filename');
+        const debugInfo = document.getElementById('debugInfo');
+        
+        // デバッグモード（URLパラメータで有効化）
+        const isDebugMode = new URLSearchParams(window.location.search).has('debug');
+        if (isDebugMode) {
+            debugInfo.style.display = 'block';
+            debugLog('Debug mode enabled');
+        }
+        
+        function debugLog(message) {
+            if (isDebugMode) {
+                console.log(message);
+                const timestamp = new Date().toLocaleTimeString();
+                debugInfo.innerHTML += `[${timestamp}] ${message}<br>`;
+                debugInfo.scrollTop = debugInfo.scrollHeight;
+            }
+        }
 
-        // ドラッグ&ドロップイベント
+        // ドキュメント全体でのドラッグ&ドロップ防止（ブラウザでファイルが開かないように）
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        // ドロップゾーン専用のドラッグ&ドロップイベント
+        dropZone.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+            debugLog('Drag enter detected');
+        });
+        
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             dropZone.classList.add('dragover');
         });
 
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // ドロップゾーンから完全に出た場合のみクラスを削除
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.classList.remove('dragover');
+                debugLog('Drag leave detected');
+            }
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             dropZone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+            debugLog(`Drop detected, files: ${e.dataTransfer.files.length}`);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            } else {
+                debugLog('ERROR: No files in drop event');
+                status.textContent = 'ファイルの読み込みに失敗しました。再度お試しください。';
+            }
         });
 
         // ファイル選択ボタンイベント
         fileSelectBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            debugLog('File select button clicked');
             
-            // イベントが信頼できるユーザーアクションから発生していることを確認
-            if (e.isTrusted) {
-                try {
-                    fileInput.click();
-                } catch (error) {
-                    console.error('File input click failed:', error);
-                    // フォールバック: 直接的な操作
-                    setTimeout(() => {
-                        fileInput.click();
-                    }, 0);
-                }
+            try {
+                // ファイル入力をリセット（同じファイルを再選択できるように）
+                fileInput.value = '';
+                fileInput.click();
+                debugLog('File input clicked successfully');
+            } catch (error) {
+                debugLog(`ERROR: File input click failed: ${error.message}`);
+                status.textContent = 'ファイル選択に失敗しました。ブラウザを再起動してください。';
             }
         });
         
         // ファイル選択イベント
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+            debugLog(`File input changed, files: ${e.target.files.length}`);
+            if (e.target.files && e.target.files.length > 0) {
+                handleFiles(e.target.files);
+            } else {
+                debugLog('WARNING: No files selected');
+            }
         });
 
         function handleFiles(files) {
+            debugLog(`handleFiles called with ${files.length} files`);
+            
+            if (!files || files.length === 0) {
+                debugLog('WARNING: No files provided to handleFiles');
+                return;
+            }
+            
             unsupportedCount = 0;
             const newDocumentFiles = [];
             
-            for (let file of files) {
+            // FileListをArrayに変換してループ
+            const fileArray = Array.from(files);
+            debugLog(`Processing files: ${fileArray.map(f => f.name).join(', ')}`);
+            
+            for (let file of fileArray) {
                 const fileName = file.name.toLowerCase();
+                debugLog(`Processing file: ${fileName}, type: ${file.type}`);
+                
                 if (file.type === 'application/pdf' || fileName.endsWith('.pdf') ||
                     fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ||
-                    fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                    fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
+                    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                    file.type === 'application/vnd.ms-excel' ||
+                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                    file.type === 'application/msword') {
                     newDocumentFiles.push(file);
+                    debugLog(`Added file: ${fileName}`);
                 } else {
                     unsupportedCount++;
+                    debugLog(`Unsupported file: ${fileName}, type: ${file.type}`);
                 }
             }
             
             documentFiles = [...documentFiles, ...newDocumentFiles];
+            debugLog(`Total files now: ${documentFiles.length}`);
+            
             updateStatus();
             updateFileList();
             updateMergeButton();
